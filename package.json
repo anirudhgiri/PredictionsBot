@@ -1,0 +1,16 @@
+{
+  "name": "predictionbot",
+  "version": "1.0.0",
+  "description": "A Discord Bot for Handling Event Prediction Competitions",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Discord",
+    "Bot",
+    "Predictions"
+  ],
+  "author": "Anirudh Giri",
+  "license": "ISC"
+}
