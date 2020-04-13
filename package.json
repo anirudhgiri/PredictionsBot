@@ -12,5 +12,10 @@
     "Predictions"
   ],
   "author": "Anirudh Giri",
-  "license": "ISC"
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^12.1.1",
+    "dotenv": "^8.2.0",
+    "google-spreadsheet": "^3.0.10"
+  }
 }
