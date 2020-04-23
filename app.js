@@ -55,6 +55,10 @@ function processCommand(message){
         case 'setform':
             setForm(message);
             break;
+        
+        case 'live':
+            live(message);
+            break;
     }
 }
 
@@ -178,6 +182,7 @@ function formClosed(){ //function to reset all google form ids to an empty strin
 function predictions(message){ //function to construct and send a google form url to the author of the ?predictions command
     if(form_url == ""){
         message.reply("Predictions is closed! Sorry!")
+        return
     }
     
     let user_id = message.author.id //message author's discord id
@@ -263,6 +268,56 @@ async function picks(message){
     }
         
     //console.log(rows[author_row]._rawData.slice(5,rows[author_row]._rawData.length))
+}
+
+/**
+ * 
+ * @param {discord.Message} message 
+ */
+async function live(message){
+    let roleArr = message.member.roles.cache.array()
+    let isEligible = false
+    for(let i = 0; i < roleArr.length; i++)
+        if((roleArr[i].name.includes("VIP") || roleArr[i].name.includes("Level 15")))
+            isEligible = true
+
+    if(!isEligible)
+        return
+    
+    // if(sheet_url == ""){
+    //     message.reply("Live score viewing is not available at the moment. Sorry!")
+    //     return
+    // }
+    let start = Date.now()
+    const doc = new GoogleSpreadsheet('1BOR5sPBoOeoCfoU4HL7W9lXQaC56Pcyv9P7zuPk5SQ0')
+    await doc.useServiceAccountAuth(require('./auth.json'))
+    await doc.loadInfo()
+    const sheet = doc.sheetsByIndex[1]
+    const rows = await sheet.getRows()
+    let end = Date.now()
+
+    console.log(end-start)
+
+    let author_row = -1
+    
+    for(let i=rows.length-1; i>=0; i--)
+        if(rows[i]._rawData[2] == message.author.id){
+            author_row = i
+            break;
+        }
+    
+    if(author_row == -1){
+        message.reply("Score not found!")
+        return
+    }
+
+
+    let embed = new discord.MessageEmbed()
+    .setColor("#FFD700")
+    .setTitle("Live Score")
+    .setDescription(`${message.author.tag}'s Live Score : ${rows[author_row]._rawData[0]}`)
+
+    message.channel.send(embed)
 }
 
 client.login(`${process.env.BOT_TOKEN}`) // log in the bot
