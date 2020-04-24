@@ -5,6 +5,9 @@ const { GoogleSpreadsheet } = require('google-spreadsheet'); //import library fo
 
 require('dotenv').config() //import library to use environment variable to store sensitive information like the bot token
 
+const score_url_doc = new GoogleSpreadsheet(`${process.env.SCORE_URL}`)
+score_url_doc.useServiceAccountAuth(require('./auth.json'))
+
 const prefix = '?' //the bot's default command prefix
 
 let form_url = "" //the Google Forms url to be sent to the user
@@ -58,6 +61,10 @@ function processCommand(message){
         
         case 'live':
             live(message);
+            break;
+
+        case 'score':
+            score(message);
             break;
     }
 }
@@ -217,11 +224,10 @@ function predictions(message){ //function to construct and send a google form ur
  */
 async function picks(message){
     
-    if(sheet_url == ""){
-        message.reply("Viewing your picks is not available right now. Sorry!")
-        return
-    }
-    
+    // if(sheet_url == ""){
+    //     message.reply("Viewing your picks is not available right now. Sorry!")
+    //     return
+    // }
     const doc = new GoogleSpreadsheet('1BOR5sPBoOeoCfoU4HL7W9lXQaC56Pcyv9P7zuPk5SQ0')
     await doc.useServiceAccountAuth(require('./auth.json'))
     await doc.loadInfo()
@@ -288,13 +294,12 @@ async function live(message){
     //     message.reply("Live score viewing is not available at the moment. Sorry!")
     //     return
     // }
-    let start = Date.now()
+    
     const doc = new GoogleSpreadsheet('1BOR5sPBoOeoCfoU4HL7W9lXQaC56Pcyv9P7zuPk5SQ0')
     await doc.useServiceAccountAuth(require('./auth.json'))
     await doc.loadInfo()
     const sheet = doc.sheetsByIndex[1]
     const rows = await sheet.getRows()
-    let end = Date.now()
 
     console.log(end-start)
 
@@ -316,6 +321,61 @@ async function live(message){
     .setColor("#FFD700")
     .setTitle("Live Score")
     .setDescription(`${message.author.tag}'s Live Score : ${rows[author_row]._rawData[0]}`)
+
+    message.channel.send(embed)
+}
+
+/**
+ * 
+ * @param {discord.Message} message 
+ */
+async function score(message){
+    await score_url_doc.loadInfo()
+    const score_url_sheet = score_url_doc.sheetsByIndex[0]
+    const rows = await score_url_sheet.getRows()
+
+    let content = message.content.split(" ")
+    if(content.length == 2){
+        for (let i = 0; i < rows.length; i++) {
+            if(rows[i]._rawData[0] == content[1]){
+                const score_doc = new GoogleSpreadsheet(`${rows[i]._rawData[1]}`)
+                await score_doc.useServiceAccountAuth(require('./auth.json'))
+                await score_doc.loadInfo()
+                const score_sheet = score_doc.sheetsByIndex[2]
+                const score_rows = await score_sheet.getRows()
+
+                let author_row = -1
+                //console.log(message.author.id)
+                for(let j = 0; j < score_rows.length; j++)
+                    //console.log(score_rows[j]._rawData[0] +' '+ message.author.id)
+                    if(score_rows[j]._rawData[0] == message.author.id){
+                        author_row = j
+                        break
+                    }
+
+                let embed = new discord.MessageEmbed()
+                .setColor("#FFD700")
+                .setTitle("Prediction Score")
+
+                if(author_row == -1)
+                    embed.setDescription(`${message.author.tag}, Score not found!`)
+        
+                else
+                    embed.setDescription(`${message.author.tag}'s \`${rows[i]._rawData[0]}\` score is : ${score_rows[author_row]._rawData[2]}
+                Your tiebreaker time was ${score_rows[author_row]._rawData[3]} seconds off
+                You ranked #${author_row} out of ${score_rows.length}`)
+
+                message.channel.send(embed)
+                return
+            }
+        }
+    }
+    
+    let embed = new discord.MessageEmbed()
+        .setColor("#FFD700")
+        .setTitle("Prediction Score")
+        .setDescription(`Available Scores:
+        \`${rows[0]._rawData[0]}\`  \`${rows[1]._rawData[0]}\`  \`${rows[2]._rawData[0]}\`  \`${rows[3]._rawData[0]}\`  \`${rows[4]._rawData[0]}\`  `)
 
     message.channel.send(embed)
 }
