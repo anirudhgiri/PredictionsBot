@@ -5,29 +5,36 @@ const { GoogleSpreadsheet } = require('google-spreadsheet'); //import library fo
 
 require('dotenv').config() //import library to use environment variable to store sensitive information like the bot token
 
-const score_url_doc = new GoogleSpreadsheet(`${process.env.SCORE_URL}`)
-score_url_doc.useServiceAccountAuth(require('./auth.json'))
+let score_url_doc = new GoogleSpreadsheet(`${process.env.SCORE_URL}`)
+let score_url_sheets = []
+let score_url_rows = []
 
-const prefix = '?' //the bot's default command prefix
+let current_doc
+let current_sheets = []
+let current_rows = []
+
+let prefix = '?' //the bot's default command prefix
 
 let form_url = "" //the Google Forms url to be sent to the user
 let form_user_id = "" //the user's discord ID
 let form_user_promotion = "" //the user's IWD promotion
 let form_user_name = "" //the user's discord username
-let sheet_url = ""
-let is_wwe = ""
+let sheet_url = "" //the URL of the Google Sheet used to store the picks
+let is_wwe = "" //if the PPV being held is a WWE PPV or Non-WWE PPV
 
-let inForm
-let formTrig
-let formChannel
+let inForm //if ?setform is currently triggered
+let formTrig //the user that triggered ?setform
+let formChannel //the channel where ?setform was triggered
 
-client.on('ready',()=>{
+client.on('ready',async function(){
+    await updateURLDoc() //update the spreadsheet used to store the URLs to score sheets
     console.log(`${client.user.tag} : Login Successful!`) //Print to console if successfully logged in
+    client.user.setActivity(`${prefix}help`)//set the activity to the help command
 })
 
 client.on('message',(msg)=>{
     if(msg.author.bot) return //if the author of a message is a bot, ignore it
-    if(inForm && (msg.author.id == formTrig.id))
+    if(inForm && (msg.author.id == formTrig.id)) //if this is a message for ?setform
         setForm(msg)
     else if(msg.content.substring(0,prefix.length) == prefix)//if the message starts with the prefix, it is a command that needs to be processed and executed by the bot
         processCommand(msg) //function to process and execute the user's command
@@ -43,6 +50,10 @@ function processCommand(message){
     command = command.slice(prefix.length)//strip the first word of the prefix
 
     switch (command) {
+        case 'help': //if the message was the help command (?help), execute help()
+            help(message)
+             break;
+
         case 'ping': //if the message was the ping command (?ping), execute ping()
             ping(message)
             break;
@@ -51,52 +62,112 @@ function processCommand(message){
             predictions(message)
             break;
 
-        case 'picks': //if the message was the predictions command (?predictions), execute predictions()
+        case 'picks': //if the message was the picks command (?picks [show]), execute picks()
             picks(message);
             break;
 
-        case 'setform':
+        case 'setform': //if the message was the setform command (?setform), execute setForm()
+            if(message.member.roles.cache.has(process.env.ADMIN_ROLE_ID))
             setForm(message);
             break;
         
-        case 'live':
+        case 'live': //if the message was the live command (?live), execute live()
             live(message);
             break;
 
-        case 'score':
+        case 'score': //if the message was the score command (?score), execute score()
             score(message);
+            break;
+
+        case 'updatescore': //if the message was the updatescore command (?updatescore), execute updatescore()
+            if(message.member.roles.cache.has(process.env.ADMIN_ROLE_ID))
+            updateURLDoc();
+            break;
+        
+        case 'closeform': //if the message was the closeform command (?closeform), execute closeform()
+            if(message.member.roles.cache.has(process.env.ADMIN_ROLE_ID))
+            formClosed();
             break;
     }
 }
 
 /**
- * 
+ * Help command that displays general information and lists out available commands
  * @param {discord.Message} message The message identified as a command
  */
-function ping(message){ //function to find the bot's ping (latency time)
-    let time = Date.now() //get the current time (Unix timestamp)
-    message.reply(`Pong! \`${time-message.createdAt.getTime()}ms\``) //Send the difference between the current time and the time at which the message was sent
+function help(message){
+    let embed = new discord.MessageEmbed()
+    .setColor("#FFD700")
+    .setTitle("DanaBot V1.0.0")
+    .setDescription(`Prefix : \`${prefix}\`
+    Ping : \` \`ms
+    ---*Commands*---
+    \`${prefix}ping\` : Ping time in milliseconds
+    \`${prefix}predictions\` : To recieve a link to the predictions form
+    \`${prefix}picks\` : To recieve a DM of your prediction picks
+    \`${prefix}picks show\` : To recieve your prediction picks as a regular message
+    \`${prefix}score\` : To view your prediction score, rank and tiebreaker accuracy
+    \`${prefix}live\` (VIP Only) : To view your prediction score live
+    `)
+    message.channel.send(embed).then((msg) => {
+        embed.setDescription(`Prefix : \`${prefix}\`
+        Ping : \`${msg.createdTimestamp - message.createdTimestamp}\`ms
+        ---*Commands*---
+        \`${prefix}ping\` : Ping time in milliseconds
+        \`${prefix}predictions\` : To recieve a link to the predictions form
+        \`${prefix}picks\` : To recieve a DM of your prediction picks
+        \`${prefix}picks show\` : To recieve your prediction picks as a regular message
+        \`${prefix}score\` : To view your prediction score, rank and tiebreaker accuracy
+        \`${prefix}live\` (VIP Only) : To view your prediction score live
+        `)
+        msg.edit(embed)
+    })
+    
 }
 
-// /**
-//  * 
-//  * @param {discord.Message} message The message identified as a command
-//  */
-// function setForm(message){ //function to set the details required to construct a google forms URL
-//     let content = message.content.substring(' ')
-//     if(content.length < 5) //the setForm command needs to have 4 arguments
-//         return
-//     form_url = content[1] //the id of the Google Form
-//     form_user_id = content[2] //id of the discord user ID field for pre-filling
-//     form_user_promotion = content[3] //id of the IWD user promotion field for pre-filling
-//     form_user_name = content[4] //id of the discord user name field for pre-filling
-// }
 
 /**
- * 
- * @param {discord.Message} message 
+ * function to find the bot's ping (latency time)
+ * @param {discord.Message} message The message identified as a command
  */
-function setForm(message){
+function ping(message){
+   message.channel.send(`Pong!`) //Send the difference between the current time and the time at which the message was sent
+   .then((msg)=>{
+       msg.edit(`Pong!\`${msg.createdTimestamp-message.createdTimestamp}ms\``)
+   })
+}
+
+/**
+ * Sets the score spreadsheet of the current PPV
+ * @param {string} URL 
+ */
+async function setCurrentDoc(URL){
+    current_doc = new GoogleSpreadsheet(URL)
+    await current_doc.useServiceAccountAuth(require('./auth.json'))
+    await current_doc.loadInfo()
+    for(let i=0; i<3; i++){
+        current_sheets.push(current_doc.sheetsByIndex[i])
+        current_rows.push(await current_sheets[i].getRows())
+    }
+}
+
+/**
+ * Updades the spreadsheet used to store the URLS of the PPV scoresheets 
+ */
+async function updateURLDoc(){
+    await score_url_doc.useServiceAccountAuth(require('./auth.json'))
+    await score_url_doc.loadInfo()
+    score_url_sheet = score_url_doc.sheetsByIndex[0]
+    score_url_rows = await score_url_sheet.getRows()
+    
+    await setScoreDoc()
+}
+
+/**
+ * Takes required information to make the ?predictions command functional
+ * @param {discord.Message} message The message identified as a command
+ */
+async function setForm(message){
     console.log(message.content.toUpperCase())
     if(!inForm){
         formChannel = message.channel
@@ -156,6 +227,7 @@ function setForm(message){
     }
     else if(sheet_url == ""){
         sheet_url = message.content
+        console.log(sheet_url)
         let embed = new discord.MessageEmbed()
         .setColor("#FFD700")
         .setTitle("Form Set!")
@@ -165,15 +237,19 @@ function setForm(message){
         Username Prefill : ${form_user_name}
         Google Sheet URL : ${sheet_url}
         Event Type : ${!is_wwe?"Non":""} WWE Event`)
+        message.channel.send("Please wait...")
+        await setCurrentDoc(sheet_url)
         formChannel.send(embed)
-
         formChannel = ""
         formTrig = ""
         inForm = false
     }
 }
 
-function formClosed(){ //function to reset all google form ids to an empty string
+/**
+ * function to reset all google form ids to an empty string
+ */
+function formClosed(){
     form_url = ""
     form_user_id = ""
     form_user_promotion = ""
@@ -183,7 +259,7 @@ function formClosed(){ //function to reset all google form ids to an empty strin
 }
 
 /**
- * 
+ * Recieves a link to the PPV predictions Google Form
  * @param {discord.Message} message The message identified as a command
  */
 function predictions(message){ //function to construct and send a google form url to the author of the ?predictions command
@@ -219,30 +295,35 @@ function predictions(message){ //function to construct and send a google form ur
 }
 
 /**
- * 
- * @param {discord.Message} message 
+ * Shows the prediction picks of the user
+ * @param {discord.Message} message The message identified as a command
+ * @param {boolean} isRefreshed If the cache of the Google Sheet being used has been refreshed
  */
-async function picks(message){
+async function picks(message, isRefreshed=false){
     
-    // if(sheet_url == ""){
-    //     message.reply("Viewing your picks is not available right now. Sorry!")
-    //     return
-    // }
-    const doc = new GoogleSpreadsheet('1BOR5sPBoOeoCfoU4HL7W9lXQaC56Pcyv9P7zuPk5SQ0')
-    await doc.useServiceAccountAuth(require('./auth.json'))
-    await doc.loadInfo()
-    const sheet = doc.sheetsByIndex[0]
-    const rows = await sheet.getRows()
+    if(sheet_url == ""){
+        message.reply("Viewing your picks is not available right now. Sorry!")
+        return
+    }
 
     const isShow = message.content.split(' ')[1] == 'show'
 
+    let offset = isWWE? 0 : 1
+
     let author_row = -1
-    
+    let rows = current_rows[0]
+
     for(let i=rows.length-1; i>=0; i--)
         if(rows[i]._rawData[1] == message.author.id){
             author_row = i
             break;
         }
+    
+    if(author_row == -1 && !isRefreshed){
+        await setCurrentDoc(sheet_url)
+        picks(message, true)
+        return
+    }
   
     let embed = new discord.MessageEmbed().setColor("#FFD700")
     if(author_row == -1){
@@ -257,7 +338,7 @@ async function picks(message){
         }
         else{
         embed.setDescription(`${message.author.tag}'s picks : 
-        \`[${(rows[author_row]._rawData.slice(5,rows[author_row]._rawData.length)).toString().replace(/,/g,', ')}]\``)
+        \`[${(rows[author_row]._rawData.slice(5 - offset,rows[author_row]._rawData.length)).toString().replace(/,/g,', ')}]\``)
         }
         message.reply(embed)
     }
@@ -273,12 +354,11 @@ async function picks(message){
         message.author.send(embed)
     }
         
-    //console.log(rows[author_row]._rawData.slice(5,rows[author_row]._rawData.length))
 }
 
 /**
- * 
- * @param {discord.Message} message 
+ * Shows the live score of the user (VIP Only)
+ * @param {discord.Message} message The message identified as a command
  */
 async function live(message){
     let roleArr = message.member.roles.cache.array()
@@ -290,18 +370,13 @@ async function live(message){
     if(!isEligible)
         return
     
-    // if(sheet_url == ""){
-    //     message.reply("Live score viewing is not available at the moment. Sorry!")
-    //     return
-    // }
+    if(sheet_url == ""){
+        message.reply("Live score viewing is not available at the moment. Sorry!")
+        return
+    }
     
-    const doc = new GoogleSpreadsheet('1BOR5sPBoOeoCfoU4HL7W9lXQaC56Pcyv9P7zuPk5SQ0')
-    await doc.useServiceAccountAuth(require('./auth.json'))
-    await doc.loadInfo()
-    const sheet = doc.sheetsByIndex[1]
-    const rows = await sheet.getRows()
 
-    console.log(end-start)
+    const rows = await current_sheets[1].getRows()
 
     let author_row = -1
     
@@ -325,30 +400,37 @@ async function live(message){
     message.channel.send(embed)
 }
 
+let score_docs = []
+let score_sheets = []
+let score_rows = []
+
 /**
- * 
- * @param {discord.Message} message 
+ * Sets the Google Spreadsheet of the 5 PPV scoresheets
+ */
+async function setScoreDoc(){
+    for(let i=0; i<5; i++){
+        score_docs.push(new GoogleSpreadsheet(score_url_rows[i]._rawData[1]))
+        await score_docs[i].useServiceAccountAuth(require('./auth.json'))
+        await score_docs[i].loadInfo()
+        score_sheets.push(score_docs[i].sheetsByIndex[2])
+        score_rows.push(await score_sheets[i].getRows())
+    }
+}
+
+/**
+ * Displays the score, rank and tiebreaker accuracy of the user
+ * @param {discord.Message} message The message identified as a command
  */
 async function score(message){
-    await score_url_doc.loadInfo()
-    const score_url_sheet = score_url_doc.sheetsByIndex[0]
-    const rows = await score_url_sheet.getRows()
-
     let content = message.content.split(" ")
     if(content.length == 2){
-        for (let i = 0; i < rows.length; i++) {
-            if(rows[i]._rawData[0] == content[1]){
-                const score_doc = new GoogleSpreadsheet(`${rows[i]._rawData[1]}`)
-                await score_doc.useServiceAccountAuth(require('./auth.json'))
-                await score_doc.loadInfo()
-                const score_sheet = score_doc.sheetsByIndex[2]
-                const score_rows = await score_sheet.getRows()
-
+        for (let i = 0; i < score_url_rows.length; i++) {
+            if(score_url_rows[i]._rawData[0] == content[1]){
                 let author_row = -1
                 //console.log(message.author.id)
-                for(let j = 0; j < score_rows.length; j++)
+                for(let j = 0; j < score_rows[i].length; j++)
                     //console.log(score_rows[j]._rawData[0] +' '+ message.author.id)
-                    if(score_rows[j]._rawData[0] == message.author.id){
+                    if(score_rows[i][j]._rawData[0] == message.author.id){
                         author_row = j
                         break
                     }
@@ -361,9 +443,9 @@ async function score(message){
                     embed.setDescription(`${message.author.tag}, Score not found!`)
         
                 else
-                    embed.setDescription(`${message.author.tag}'s \`${rows[i]._rawData[0]}\` score is : ${score_rows[author_row]._rawData[2]}
-                Your tiebreaker time was ${score_rows[author_row]._rawData[3]} seconds off
-                You ranked #${author_row} out of ${score_rows.length}`)
+                    embed.setDescription(`${message.author.tag}'s \`${score_url_rows[i]._rawData[0]}\` score is : ${score_rows[i][author_row]._rawData[2]}
+                Your tiebreaker time was ${score_rows[i][author_row]._rawData[3]} seconds off
+                You ranked #${author_row} out of ${score_rows[i].length}`)
 
                 message.channel.send(embed)
                 return
@@ -375,7 +457,7 @@ async function score(message){
         .setColor("#FFD700")
         .setTitle("Prediction Score")
         .setDescription(`Available Scores:
-        \`${rows[0]._rawData[0]}\`  \`${rows[1]._rawData[0]}\`  \`${rows[2]._rawData[0]}\`  \`${rows[3]._rawData[0]}\`  \`${rows[4]._rawData[0]}\`  `)
+        \`${score_url_rows[0]._rawData[0]}\`  \`${score_url_rows[1]._rawData[0]}\`  \`${score_url_rows[2]._rawData[0]}\`  \`${score_url_rows[3]._rawData[0]}\`  \`${score_url_rows[4]._rawData[0]}\`  `)
 
     message.channel.send(embed)
 }
