@@ -264,7 +264,7 @@ function formClosed(){
  */
 function predictions(message){ //function to construct and send a google form url to the author of the ?predictions command
     if(form_url == ""){
-        message.reply("Predictions is closed! Sorry!")
+        message.reply("Predictions are closed! Sorry!")
         return
     }
     
@@ -275,7 +275,7 @@ function predictions(message){ //function to construct and send a google form ur
     message.member.roles.cache.array().forEach((val)=>{
         roleArr.push(val.name)
     })
-    //if the author belongs to one of IWD's promotions, have it set to user_promotion. Else, the promotion is considered "Independant"
+    //if the author belongs to one of IWD's promotions, have it set to user_promotion. Else, the promotion is considered "Independent"
     if(roleArr.includes("High Flyers"))
         user_promotion = "High_Flyers"
     else if(roleArr.includes("SubmissionSpecialists"))
@@ -283,7 +283,7 @@ function predictions(message){ //function to construct and send a google form ur
     else if(roleArr.includes("Technical Wizards"))
         user_promotion = "Technical_Wizards"
     else
-        user_promotion = "Independant"
+        user_promotion = "Independent"
     let url = `https://docs.google.com/forms/d/e/${form_url}/viewform?usp=pp_url&entry.${form_user_id}=${user_id}&entry.${form_user_promotion}=${user_promotion}&entry.${form_user_name}=${user_name}` //construct a Google Form URL using a template literal
     
     let embed = new discord.MessageEmbed()
@@ -308,7 +308,7 @@ async function picks(message, isRefreshed=false){
 
     const isShow = message.content.split(' ')[1] == 'show'
 
-    let offset = isWWE? 0 : 1
+    let offset = is_wwe? 0 : 1
 
     let author_row = -1
     let rows = current_rows[0]
@@ -327,17 +327,18 @@ async function picks(message, isRefreshed=false){
   
     let embed = new discord.MessageEmbed().setColor("#FFD700")
     if(author_row == -1){
-        embed.setDescription(`${message.author.tag}'s picks : 
+        embed.setDescription(`${message.author.username}'s picks : 
         \`Picks Not Found! Get your predictions form by using the ?predictions command in #botspam and fill it in!\``)
         message.reply(embed)
+        return
     }
     if(isShow){
         if(author_row == -1){
-        embed.setDescription(`${message.author.tag}'s picks : 
+        embed.setDescription(`${message.author.username}'s picks : 
         \`Picks Not Found! Get your predictions form by using the ?predictions command in #botspam and fill it in!\``)
         }
         else{
-        embed.setDescription(`${message.author.tag}'s picks : 
+        embed.setDescription(`${message.author.username}'s picks : 
         \`[${(rows[author_row]._rawData.slice(5 - offset,rows[author_row]._rawData.length)).toString().replace(/,/g,', ')}]\``)
         }
         message.reply(embed)
@@ -348,7 +349,7 @@ async function picks(message, isRefreshed=false){
         \`Picks Not Found! Get your predictions form by using the ?predictions command in #botspam and fill it in!\``)
         }
         else{
-        embed.setDescription(`${message.author.tag}'s picks : 
+        embed.setDescription(`${message.author.username}'s picks : 
         \`[${(rows[author_row]._rawData.slice(4,rows[author_row]._rawData.length)).toString().replace(/,/g,', ')}]\``)
         }
         message.author.send(embed)
@@ -395,7 +396,7 @@ async function live(message){
     let embed = new discord.MessageEmbed()
     .setColor("#FFD700")
     .setTitle("Live Score")
-    .setDescription(`${message.author.tag}'s Live Score : ${rows[author_row]._rawData[0]}`)
+    .setDescription(`${message.author.username}'s Live Score : ${rows[author_row]._rawData[0]}`)
 
     message.channel.send(embed)
 }
@@ -408,6 +409,9 @@ let score_rows = []
  * Sets the Google Spreadsheet of the 5 PPV scoresheets
  */
 async function setScoreDoc(){
+    score_docs = []
+    score_sheets = []
+    score_rows = []
     for(let i=0; i<5; i++){
         score_docs.push(new GoogleSpreadsheet(score_url_rows[i]._rawData[1]))
         await score_docs[i].useServiceAccountAuth(require('./auth.json'))
@@ -440,12 +444,12 @@ async function score(message){
                 .setTitle("Prediction Score")
 
                 if(author_row == -1)
-                    embed.setDescription(`${message.author.tag}, Score not found!`)
+                    embed.setDescription(`${message.author.username}, Score not found!`)
         
                 else
-                    embed.setDescription(`${message.author.tag}'s \`${score_url_rows[i]._rawData[0]}\` score is : ${score_rows[i][author_row]._rawData[2]}
+                    embed.setDescription(`${message.author.username}'s \`${score_url_rows[i]._rawData[0]}\` score is : ${score_rows[i][author_row]._rawData[2]}
                 Your tiebreaker time was ${score_rows[i][author_row]._rawData[3]} seconds off
-                You ranked #${author_row} out of ${score_rows[i].length}`)
+                You ranked #${author_row+1} out of ${score_rows[i].length}`)
 
                 message.channel.send(embed)
                 return
