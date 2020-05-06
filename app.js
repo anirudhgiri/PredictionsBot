@@ -30,11 +30,13 @@ let formTrig //the user that triggered ?setform
 let formChannel //the channel where ?setform was triggered
 
 client.on('ready',async function(){
-    //await updateURLDoc() //update the spreadsheet used to store the URLs to score sheets
+    await updateURLDoc() //update the spreadsheet used to store the URLs to score sheets
     await pg_client.connect();
     console.log(`${client.user.tag} : Login Successful!`) //Print to console if successfully logged in
     client.user.setActivity(`${prefix}help`);//set the activity to the help command
     ({form_url, form_user_id, form_user_promotion, form_user_name, sheet_url, is_wwe} = await(await pg_client.query('SELECT * FROM vals')).rows[0])
+    if(sheet_url != "")
+        setCurrentDoc(sheet_url)
 })
 
 client.on('message',(msg)=>{
@@ -147,6 +149,9 @@ function ping(message){
  * @param {string} URL 
  */
 async function setCurrentDoc(URL){
+    current_doc = []
+    current_sheets = []
+    current_rows = [] 
     current_doc = new GoogleSpreadsheet(URL)
     await current_doc.useServiceAccountAuth(require('./auth.json'))
     await current_doc.loadInfo()
@@ -331,7 +336,7 @@ async function picks(message){
             author_row = i
             break;
         }
-    
+
     if(author_row == -1){
         await setCurrentDoc(sheet_url)
         rows = current_rows[0]
