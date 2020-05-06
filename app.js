@@ -311,9 +311,8 @@ function predictions(message){ //function to construct and send a google form ur
 /**
  * Shows the prediction picks of the user
  * @param {discord.Message} message The message identified as a command
- * @param {boolean} isRefreshed If the cache of the Google Sheet being used has been refreshed
  */
-async function picks(message, isRefreshed=false){
+async function picks(message){
     
     if(sheet_url == ""){
         message.reply("Viewing your picks is not available right now. Sorry!")
@@ -333,10 +332,14 @@ async function picks(message, isRefreshed=false){
             break;
         }
     
-    if(author_row == -1 && !isRefreshed){
+    if(author_row == -1){
         await setCurrentDoc(sheet_url)
-        picks(message, true)
-        return
+        rows = current_rows[0]
+        for(let i=rows.length-1; i>=0; i--)
+        if(rows[i]._rawData[1] == message.author.id){
+            author_row = i
+            break;
+        }
     }
   
     let embed = new discord.MessageEmbed().setColor("#FFD700")
