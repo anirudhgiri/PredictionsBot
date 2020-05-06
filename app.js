@@ -5,6 +5,9 @@ const { GoogleSpreadsheet } = require('google-spreadsheet'); //import library fo
 
 require('dotenv').config() //import library to use environment variable to store sensitive information like the bot token
 
+const pg = require('pg')
+const pg_client = new pg.Client()
+
 let score_url_doc = new GoogleSpreadsheet(`${process.env.SCORE_URL}`)
 let score_url_sheets = []
 let score_url_rows = []
@@ -27,9 +30,11 @@ let formTrig //the user that triggered ?setform
 let formChannel //the channel where ?setform was triggered
 
 client.on('ready',async function(){
-    await updateURLDoc() //update the spreadsheet used to store the URLs to score sheets
+    //await updateURLDoc() //update the spreadsheet used to store the URLs to score sheets
+    await pg_client.connect();
     console.log(`${client.user.tag} : Login Successful!`) //Print to console if successfully logged in
-    client.user.setActivity(`${prefix}help`)//set the activity to the help command
+    client.user.setActivity(`${prefix}help`);//set the activity to the help command
+    ({form_url, form_user_id, form_user_promotion, form_user_name, sheet_url, is_wwe} = await(await pg_client.query('SELECT * FROM vals')).rows[0])
 })
 
 client.on('message',(msg)=>{
@@ -163,6 +168,13 @@ async function updateURLDoc(){
     await setScoreDoc()
 }
 
+async function updateDatabase(){
+    const query = 'UPDATE vals SET form_url = $1, form_user_id = $2, form_user_promotion = $3, form_user_name = $4, sheet_url = $5, is_wwe = $6';
+    const params = [form_url, form_user_id, form_user_promotion, form_user_name, sheet_url, is_wwe];
+    await pg_client.query(query,params);
+}
+
+
 /**
  * Takes required information to make the ?predictions command functional
  * @param {discord.Message} message The message identified as a command
@@ -238,6 +250,7 @@ async function setForm(message){
         Google Sheet URL : ${sheet_url}
         Event Type : ${!is_wwe?"Non":""} WWE Event`)
         message.channel.send("Please wait...")
+        await updateDatabase()
         await setCurrentDoc(sheet_url)
         formChannel.send(embed)
         formChannel = ""
@@ -249,13 +262,14 @@ async function setForm(message){
 /**
  * function to reset all google form ids to an empty string
  */
-function formClosed(){
+async function formClosed(){
     form_url = ""
     form_user_id = ""
     form_user_promotion = ""
     form_user_name = ""
     sheet_url = ""
     is_wwe = ""
+    await updateDatabase()
 }
 
 /**
