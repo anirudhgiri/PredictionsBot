@@ -93,7 +93,7 @@ function processCommand(message){
         
         case 'closeform': //if the message was the closeform command (?closeform), execute closeform()
             if(message.member.roles.cache.has(process.env.ADMIN_ROLE_ID))
-            formClosed();
+            formClosed(message);
             break;
     }
 }
@@ -266,8 +266,9 @@ async function setForm(message){
 
 /**
  * function to reset all google form ids to an empty string
+ * @param {discord.Message} message The message identified as a command
  */
-async function formClosed(){
+async function formClosed(message){
     form_url = ""
     form_user_id = ""
     form_user_promotion = ""
@@ -275,6 +276,7 @@ async function formClosed(){
     sheet_url = ""
     is_wwe = ""
     await updateDatabase()
+    message.reply("Form Closed.")
 }
 
 /**
