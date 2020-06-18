@@ -35,13 +35,14 @@ client.on('ready',async function(){
     console.log(`${client.user.tag} : Login Successful!`) //Print to console if successfully logged in
     client.user.setActivity(`${prefix}help`);//set the activity to the help command
     ({form_url, form_user_id, form_user_promotion, form_user_name, sheet_url, is_wwe} = await(await pg_client.query('SELECT * FROM vals')).rows[0])
+    is_wwe = (is_wwe == 'true');
     if(sheet_url != "")
         setCurrentDoc(sheet_url)
 })
 
 client.on('message',(msg)=>{
     if(msg.author.bot) return //if the author of a message is a bot, ignore it
-    if(inForm && (msg.author.id == formTrig.id)) //if this is a message for ?setform
+    if(inForm && (msg.author.id == formTrig.id) && (msg.channel == formChannel)) //if this is a message for ?setform
         setForm(msg)
     else if(msg.content.substring(0,prefix.length) == prefix)//if the message starts with the prefix, it is a command that needs to be processed and executed by the bot
         processCommand(msg) //function to process and execute the user's command
@@ -191,6 +192,13 @@ async function setForm(message){
         formTrig = message.author
         inForm = true
 
+        is_wwe = ""
+        sheet_url = ""
+        form_url = ""
+        form_user_id = ""
+        form_user_promotion = ""
+        form_user_name = ""
+
         let embed = new discord.MessageEmbed()
         .setColor("#FFD700")
         .setTitle("**WWE PPV?**")
@@ -273,8 +281,6 @@ async function formClosed(message){
     form_user_id = ""
     form_user_promotion = ""
     form_user_name = ""
-    sheet_url = ""
-    is_wwe = ""
     await updateDatabase()
     message.reply("Form Closed.")
 }
@@ -283,10 +289,17 @@ async function formClosed(message){
  * Recieves a link to the PPV predictions Google Form
  * @param {discord.Message} message The message identified as a command
  */
-function predictions(message){ //function to construct and send a google form url to the author of the ?predictions command
+async function predictions(message){ //function to construct and send a google form url to the author of the ?predictions command
     if(form_url == ""){
         message.reply("Predictions are closed! Sorry!")
         return
+    }
+
+    for(let i = 0; i < current_rows[0].length; i++){
+        if(current_rows[0][i]._rawData[1] == message.author.id){
+            await setCurrentDoc(sheet_url);
+            break;
+        }
     }
     
     let user_id = message.author.id //message author's discord id
